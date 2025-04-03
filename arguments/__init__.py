@@ -37,18 +37,29 @@ class ParamGroup:
                 else:
                     group.add_argument("--" + key, default=value, type=t)
 
-    def extract(self, args):
+    def extract_org(self, args):
         group = GroupParams()
         for arg in vars(args).items():
             if arg[0] in vars(self) or ("_" + arg[0]) in vars(self):
                 setattr(group, arg[0], arg[1])
         return group
 
+    def extract(self, args):
+        """Extracts arguments directly into the main Namespace"""
+        for key, value in vars(self).items():
+            # Remove underscore prefix for shorthand args
+            if key.startswith('_'):
+                key = key[1:]
+            # Skip if already exists in args (allowing command line to override)
+            if not hasattr(args, key):
+                setattr(args, key, value)
+        return args  # Return modified args for chaining
+
 class ModelParams(ParamGroup): 
     def __init__(self, parser, sentinel=False):
         self.sh_degree = 3
-        self._source_path = ""
-        self._model_path = ""
+        #self._source_path = ""
+        #self._model_path = ""
         self._images = "images"
         self._resolution = -1
         self._white_background = False
@@ -58,7 +69,7 @@ class ModelParams(ParamGroup):
 
     def extract(self, args):
         g = super().extract(args)
-        g.source_path = os.path.abspath(g.source_path)
+        #g.source_path = os.path.abspath(g.source_path)
         return g
 
 class iComMaParams(ParamGroup):

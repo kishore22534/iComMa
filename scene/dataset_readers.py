@@ -14,7 +14,7 @@ import sys
 from PIL import Image
 from typing import NamedTuple
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
-    read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
+    read_extrinsics_binary, read_extrinsics_binary_2, read_intrinsics_binary, read_points3D_binary, read_points3D_text
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
 import json
@@ -66,7 +66,7 @@ def getNerfppNorm(cam_info):
     return {"translate": translate, "radius": radius}
 
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
-    cam_infos = []
+    cam_infos = []    
     for idx, key in enumerate(cam_extrinsics):
         sys.stdout.write('\r')
         # the exact output you're looking for:
@@ -104,6 +104,63 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     sys.stdout.write('\n')
     return cam_infos
 
+def readColmapCameras_2(cam_extrinsics, cam_intrinsics, images_folder):
+    cam_infos = []
+    
+    for idx, key in enumerate(cam_extrinsics):
+
+        extr = cam_extrinsics[key]
+        intr = cam_intrinsics[extr.camera_id]
+        height = intr.height
+        width = intr.width
+
+        uid = intr.id
+        identity_r = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+
+        R = np.transpose(identity_r)
+        T = np.array([0.0, 0.0, 0.0])
+
+        # R = np.transpose(qvec2rotmat(extr.qvec))
+        # T = np.array(extr.tvec)
+
+        print(f"hhh--In modified readColmapCameras_2-------------------------")
+        print(f"hhh--camera id: {extr.camera_id}, height: {height}, width: {width}, R:{R}, T:{T}")
+
+        if intr.model=="SIMPLE_PINHOLE":
+            focal_length_x = intr.params[0]
+            FovY = focal2fov(focal_length_x, height)
+            FovX = focal2fov(focal_length_x, width)
+            print(f"hhhh-----focal_length_x:{focal_length_x}  FovY:{FovY}, FovX:{FovX}")
+        elif intr.model=="PINHOLE":
+            focal_length_x = intr.params[0]
+            focal_length_y = intr.params[1]
+            FovY = focal2fov(focal_length_y, height)
+            FovX = focal2fov(focal_length_x, width)
+            print(f"hhhh-----focal_length_x:{focal_length_x},focal_length_y:{focal_length_y},  FovY:{FovY}, FovX:{FovX}")
+        else:
+            assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+
+        # List all files in the images_folder
+        files_in_folder = os.listdir(images_folder)
+        #print(f"hhh-imagefolder name is {images_folder}")
+        #jpg_files = [f for f in files_in_folder if f.endswith('.jpg')]
+        jpg_files = [f for f in files_in_folder if f.lower().endswith(('.jpg', '.png'))]
+        
+        image_name = jpg_files[0] 
+        image_path = os.path.join(images_folder, image_name)
+        print(f"hhh-- TEST Image path: {image_path}")
+        
+        
+        image_name = os.path.basename(image_path).split(".")[0]
+        image = Image.open(image_path)
+
+        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                              image_path=image_path, image_name=image_name, width=width, height=height)
+        cam_infos.append(cam_info)
+        break
+    sys.stdout.write('\n')
+    return cam_infos
+
 def fetchPly(path):
     plydata = PlyData.read(path)
     vertices = plydata['vertex']
@@ -128,6 +185,49 @@ def storePly(path, xyz, rgb):
     vertex_element = PlyElement.describe(elements, 'vertex')
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
+
+
+def readColmapSceneInfo_2(path, images, eval, llffhold=8):
+    print(f"hh-readColmapSceneInfo path :{path}, images:{images}, eval:{eval}")
+   
+    cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
+    cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
+    cam_extrinsics = read_extrinsics_binary_2(cameras_extrinsic_file)
+    cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
+    print(f"hh--- cam_intrinsics are: id{cam_intrinsics[1].id}, model:{cam_intrinsics[1].model}, width:{cam_intrinsics[1].width}, height:{cam_intrinsics[1].height},,params:{cam_intrinsics[1].params}")
+   
+
+    reading_dir = "test_image"  #"images" if images == None else images
+    cam_infos_unsorted = _2(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
+    cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
+    print(f"hh- eval is set to {eval}")
+
+    train_cam_infos = cam_infos
+   
+    nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    ply_path = os.path.join(path, "sparse/0/points3D.ply")
+    bin_path = os.path.join(path, "sparse/0/points3D.bin")
+    txt_path = os.path.join(path, "sparse/0/points3D.txt")
+    if not os.path.exists(ply_path):
+        print("Converting point3d.bin to .ply, will happen only the first time you open the scene.")
+        try:
+            xyz, rgb, _ = read_points3D_binary(bin_path)
+        except:
+            xyz, rgb, _ = read_points3D_text(txt_path)
+        storePly(ply_path, xyz, rgb)
+    try:
+        pcd = fetchPly(ply_path)
+        print(f"hhh--- PLY_PATH: {ply_path}")
+    except:
+        pcd = None
+    print(f"hhh---TRAIN CAMERAS:{train_cam_infos}")
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=[],
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)
+    return scene_info
 
 def readColmapSceneInfo(path, images, eval, llffhold=8):
     try:
