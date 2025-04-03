@@ -60,6 +60,8 @@ class Camera(nn.Module):
                  ):
         super(Camera, self).__init__()
 
+        print(f"hh---- In Camera class:image_name {image_name}, FoVx:{FoVx}, FoVy:{FoVy}, gt_alpha_mask:{gt_alpha_mask}")
+
         self.uid = uid
         self.colmap_id = colmap_id
         self.R = R
