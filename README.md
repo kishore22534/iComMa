@@ -4,7 +4,7 @@
 
 ## Added results folder containing images. Each .png photo shows the rendered image from the current pose superimposed on the query image. When the predicted pose matches with the pose of the query image, then we can see no effect of superimposition. 
 
-## Image 616.jpg- 0.png show the superimposition at the start of the prediction and 616.jpg- 499.png shows the superimposition at the end of 500th iteration. 616.jpgvideo.gif show the progress as a gif video.
+##How to interpret the images in results folder: For example image 616.jpg- 0.png show the superimposition at the start of the prediction and 616.jpg- 499.png shows the superimposition at the end of 500th iteration. 616.jpgvideo.gif show the progress as a gif video.
 
 
 
