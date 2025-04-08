@@ -2,6 +2,10 @@
 
 ## The original repo code takes a single index of the test/train image as input and also "delta" to the ground truth pose. In this repo, the code is modified so that it takes camera intrinsic parameters and folder path containing sequence of images (undistorted) for which we want to estimate the poses (these images need not be from test/train set)  and also some initial pose for the first image ( should be close enough to the ground truth) . It then estimates the poses of all the images in that folder. (It is assumed that the images in the folder are genrrated from some robot following certain path). The initial pose for  nth image will the estimated pose for (n-1)th image where n>1. All the below details regarding setup are same as that of the original repo. Results and instructions will be updated shortly
 
+## Added results folder containing images. Each .png photo shows the render image from the current pose superimposed on the query image. When the predicted pose matches with the pose of the query image, then we can see no effect of superimposition. 
+
+## Image 616.jpg- 0.png show the superimposition at the start of the prediction and 616.jpg- 499.png shows the superimposition at the end of 500th iteration. 616.jpgvideo.gif show the progress as a gif video.
+
 
 
  <a href='https://arxiv.org/pdf/2312.09031.pdf'><img src='https://img.shields.io/badge/ArXiv-PDF-red'></a> &nbsp; <a href='https://yuansun-xjtu.github.io/iComMa.io/'><img src='https://img.shields.io/badge/Project-Page-Green'></a>
